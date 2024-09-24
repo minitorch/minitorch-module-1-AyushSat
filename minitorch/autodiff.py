@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Tuple
+from typing import Any, Iterable, Tuple
 
 from typing_extensions import Protocol
 
@@ -22,8 +22,12 @@ def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) 
     Returns:
         An approximation of $f'_i(x_0, \ldots, x_{n-1})$
     """
-    # TODO: Implement for Task 1.1.
-    raise NotImplementedError("Need to implement for Task 1.1")
+
+    list_vals_minus_ep, list_vals_plus_ep = [val for val in vals], [val for val in vals]
+    if arg >= 0 and arg < len(list_vals_minus_ep):
+        list_vals_minus_ep[arg] = list_vals_minus_ep[arg] - epsilon
+        list_vals_plus_ep[arg] = list_vals_plus_ep[arg] + epsilon
+    return (f(*list_vals_plus_ep) - f(*list_vals_minus_ep)) / (2 * epsilon)
 
 
 variable_count = 1
@@ -61,8 +65,20 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
     Returns:
         Non-constant Variables in topological order starting from the right.
     """
-    # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    top_sort: list[Variable] = []
+    marked: set[int] = set()
+
+    def visit(node: Variable) -> None:
+        if node.unique_id in marked:
+            return
+
+        for p in node.parents:
+            visit(p)
+        marked.add(node.unique_id)
+        top_sort.append(node)
+
+    visit(variable)
+    return top_sort
 
 
 def backpropagate(variable: Variable, deriv: Any) -> None:
@@ -76,8 +92,25 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
 
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
-    # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    top_sort: list[Variable] = list(topological_sort(variable))[::-1]
+    intermediate_mapping: dict[int, float] = {} # map of scalar unique id's to current derivative
+
+    def sub(var: Variable, init_deriv: Any = None) -> None:
+        if var.is_leaf():
+            if var.unique_id in intermediate_mapping:
+                var.accumulate_derivative(intermediate_mapping[var.unique_id])
+            return
+
+        curr_deriv = intermediate_mapping.get(var.unique_id, init_deriv)
+        res: Iterable[Tuple[Variable, Any]] = var.chain_rule(curr_deriv)
+        for chainvar, chainval in res:
+            if chainvar.unique_id in intermediate_mapping:
+                intermediate_mapping[chainvar.unique_id] += chainval
+            else:
+                intermediate_mapping[chainvar.unique_id] = chainval
+
+    for v in top_sort:
+        sub(v, init_deriv=deriv)
 
 
 @dataclass
